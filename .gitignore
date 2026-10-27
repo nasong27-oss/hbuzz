@@ -1,0 +1,21 @@
+# 비밀키·자격증명 — 절대 커밋 금지
+.env
+.env*.local
+collector/.env
+
+# 수집기 상태/캐시
+collector/data/
+collector/reports/
+collector/.venv/
+__pycache__/
+*.pyc
+
+# Next.js
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+
+.DS_Store

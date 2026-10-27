@@ -1,0 +1,8 @@
+# 데일리 온라인 버즈 — 직접 의존성
+requests==2.32.5
+beautifulsoup4==4.15.0
+lxml==6.1.1
+twikit==1.3.16                 # X(트위터) 보조 수집기
+google-play-scraper==1.2.7     # 구글플레이 현대카드 앱 리뷰 수집
+app-store-web-scraper==0.2.0   # 앱스토어 현대카드 앱 리뷰 수집(amp-api, 구 iTunes RSS 대체)
+psycopg[binary]==3.2.10          # Neon Postgres(웹 대시보드 공유 DB)
