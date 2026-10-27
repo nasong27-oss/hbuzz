@@ -1,0 +1,42 @@
+# 사이트별 수집 가능 여부 진단 (GitHub Actions 러너 = 미국 데이터센터 IP)
+# 실행: Actions 탭 > "수집 진단" > Run workflow, 또는 diag-run 브랜치에 push
+# 결과: diag-results 브랜치의 github-actions.json + 실행 요약(Summary)
+name: 수집 진단
+on:
+  workflow_dispatch:
+  push:
+    branches: [diag-run]
+permissions:
+  contents: write
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 의존성
+        run: pip install -q -r collector/requirements.txt
+      - name: 진단 실행
+        working-directory: collector
+        env:
+          TZ: Asia/Seoul
+        run: |
+          python diag.py --env github-actions --out /tmp/github-actions.json --timeout 150 | tee /tmp/diag.txt
+          { echo '```'; grep -A40 '^\[github-actions\]' /tmp/diag.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: 결과 저장(diag-results 브랜치)
+        run: |
+          git config user.name "hbuzz-diag"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin diag-results || true
+          if git rev-parse --verify origin/diag-results >/dev/null 2>&1; then
+            git checkout -B diag-results origin/diag-results
+          else
+            git checkout --orphan diag-results && git rm -rqf .
+          fi
+          cp /tmp/github-actions.json github-actions.json
+          git add github-actions.json
+          git commit -qm "진단 결과 $(date +%F' '%T)" || true
+          git push -q origin diag-results

@@ -2,8 +2,10 @@
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-REPORT_DIR = os.path.join(BASE_DIR, "reports")
+# 클라우드(Vercel)처럼 코드 폴더가 읽기 전용인 곳에서는 HBUZZ_DATA_DIR(/tmp/...)로 돌린다.
+_DATA_ROOT = os.environ.get("HBUZZ_DATA_DIR", "")
+DATA_DIR = os.path.join(_DATA_ROOT, "data") if _DATA_ROOT else os.path.join(BASE_DIR, "data")
+REPORT_DIR = os.path.join(_DATA_ROOT, "reports") if _DATA_ROOT else os.path.join(BASE_DIR, "reports")
 
 
 def load_env():
