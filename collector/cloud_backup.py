@@ -22,6 +22,7 @@ import db  # noqa: E402
 ENV = "vercel-icn1"
 COLLECT_DEADLINE = 110  # 초. Vercel Hobby 함수 최대 300초 안에 분류·리포트까지 끝내기 위함
 ALWAYS_SKIP = {"X"}
+NAVER_CLOUD_PAGES = 2   # 집 Mac 은 최대 10페이지
 BAD = {"blocked", "unreachable", "timeout"}
 
 
@@ -54,6 +55,8 @@ def make_collector(sources, deadline=None):
     def collect(keywords):
         limit = deadline or COLLECT_DEADLINE
         _reset_markers()
+        # 네이버카페는 변형 10개를 다 돈 뒤에야 결과를 돌려주므로, 마감 안에 끝나게 페이지를 줄인다
+        collectors.NAVER_MAX_PAGES = min(collectors.NAVER_MAX_PAGES, NAVER_CLOUD_PAGES)
         collectors.SOURCE_STATS.clear()
         lock = threading.Lock()
         buckets = {n: [] for n in sources}

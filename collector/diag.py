@@ -133,6 +133,10 @@ def run(env, keyword="현대카드", timeout=90, workers=8, sources=None):
     _install_recorder()
     targets = {n: f for n, f in collectors.COLLECTORS.items() if n not in SKIP}
     targets["구글뉴스"] = _news_probe
+    # 네이버카페 수집기는 검색어 변형 10개 × 여러 페이지를 다 돌고 나서야 반환해 진단엔 너무 길다.
+    # 접근 가능 여부만 보면 되므로 1페이지 1회 요청으로 대신한다.
+    if "네이버카페" in targets:
+        targets["네이버카페"] = lambda kw: collectors._naver_cafe_web_fetch(kw, start=1)
     if sources:
         targets = {n: f for n, f in targets.items() if n in sources}
     # 일부 수집기는 '실행당 1회' 마커가 있어 초기화해 둔다
