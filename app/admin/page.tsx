@@ -8,6 +8,7 @@ import { Flash, Nav } from "@/components/ui";
 import { CloudPanel } from "@/components/CloudPanel";
 import { kstToday } from "@/lib/time";
 import { alertRecipients } from "@/lib/alert";
+import { CLASSIFIER_MODES, CLAUDE_MODELS, getSettings } from "@/lib/settings";
 import {
   addKeywords,
   addRecipients,
@@ -15,6 +16,7 @@ import {
   deleteRecipient,
   initDb,
   renameRecipient,
+  saveClassifierSettings,
   sendTestAlert,
   sendTestMail,
   toggleKeyword,
@@ -27,6 +29,7 @@ type SP = Record<string, string | string[] | undefined>;
 const TABS = [
   ["recipients", "수신자"],
   ["keywords", "키워드"],
+  ["classifier", "분류 설정"],
   ["sends", "발송 이력"],
   ["ops", "운영"],
 ] as const;
@@ -45,6 +48,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         await Recipients()
       ) : tab === "keywords" ? (
         await Keywords()
+      ) : tab === "classifier" ? (
+        await Classifier()
       ) : tab === "sends" ? (
         await Sends()
       ) : (
@@ -246,6 +251,111 @@ async function Keywords() {
       ) : (
         <div className="empty-state">DB 키워드가 없어 Mac 설정값을 쓰는 중입니다.</div>
       )}
+    </div>
+  );
+}
+
+// ── 분류 설정 ─────────────────────────────────────────
+
+async function Classifier() {
+  const [cur, usage] = await Promise.all([
+    getSettings(),
+    q<{ kind: string; cc: number; api: number; fb: number; runs: number }>(
+      `SELECT kind,
+              COALESCE(sum((claude->'via'->>'claude-code')::int), 0)::int AS cc,
+              COALESCE(sum((claude->'via'->>'api')::int), 0)::int AS api,
+              COALESCE(sum((claude->>'fallback')::int), 0)::int AS fb,
+              count(*)::int AS runs
+       FROM runs WHERE started_at > now() - interval '7 days' AND kind IN ('generate','query','cloud')
+       GROUP BY kind`,
+    ),
+  ]);
+  const mode = cur.mode?.value ?? "auto";
+  const model = cur.model?.value ?? "claude-sonnet-5-5";
+  const fromDb = Boolean(cur.mode || cur.model);
+  const updated = [cur.mode?.updated_at, cur.model?.updated_at].filter(Boolean).sort().pop();
+  const total = usage.reduce(
+    (a, u) => ({ cc: a.cc + u.cc, api: a.api + u.api, fb: a.fb + u.fb }),
+    { cc: 0, api: 0, fb: 0 },
+  );
+  const KIND_LABEL: Record<string, string> = { generate: "아침 리포트", query: "수집 요청", cloud: "클라우드 백업" };
+
+  return (
+    <div className="stack">
+      <p className="lede" style={{ marginBottom: 0 }}>
+        집 Mac은 매 실행을 시작할 때 이 설정을 읽습니다. 저장하면 다음 실행부터 적용되고, Mac에서 따로 할 일은 없습니다.
+      </p>
+
+      <form action={saveClassifierSettings} className="panel stack">
+        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend><h2 style={{ margin: "0 0 8px" }}>분류 경로</h2></legend>
+          <div className="stack" style={{ gap: 0 }}>
+            {CLASSIFIER_MODES.map((m) => (
+              <label key={m.value} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontWeight: 500, color: "var(--ink)" }}>
+                <input type="radio" name="mode" value={m.value} defaultChecked={m.value === mode} style={{ marginTop: 5 }} />
+                <span>
+                  {m.label}
+                  <span className="small muted" style={{ display: "block", fontWeight: 400 }}>{m.desc}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="field" style={{ maxWidth: 360 }}>
+          <label htmlFor="model">모델</label>
+          <select id="model" name="model" defaultValue={model}>
+            {CLAUDE_MODELS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label} ({m.desc})
+              </option>
+            ))}
+          </select>
+          <span className="small muted">구독·API 키 경로 모두 이 모델을 씁니다.</span>
+        </div>
+
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <span className="small muted">
+            {fromDb ? `마지막 변경 ${fmtDateTime(updated ?? null)}` : "아직 저장한 적이 없어 집 Mac의 .env 값(기본: 구독 우선, Sonnet 5.5)을 쓰는 중입니다."}
+          </span>
+          <button className="btn-primary" type="submit">저장</button>
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>
+          클라우드 백업 수집은 구독 로그인이 없어 경로 설정과 관계없이 API 키를 씁니다(모델은 이 설정을 따름).
+        </p>
+      </form>
+
+      <div className="panel stack">
+        <h2 style={{ margin: 0 }}>최근 7일 분류 호출</h2>
+        {usage.length ? (
+          <>
+            <p style={{ margin: 0 }}>
+              구독 <b>{total.cc}</b>회, API 키 <b>{total.api}</b>회
+              {total.fb ? <span className="sent-neg">, 키워드 규칙으로 대체 {total.fb}건</span> : null}
+            </p>
+            <div className="table-wrap">
+              <table className="t">
+                <thead>
+                  <tr><th>작업</th><th className="num">실행</th><th className="num">구독</th><th className="num">API 키</th><th className="num">키워드 대체</th></tr>
+                </thead>
+                <tbody>
+                  {usage.map((u) => (
+                    <tr key={u.kind}>
+                      <td>{KIND_LABEL[u.kind] ?? u.kind}</td>
+                      <td className="num">{u.runs}</td>
+                      <td className="num">{u.cc}</td>
+                      <td className="num">{u.api}</td>
+                      <td className="num">{u.fb}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>아직 기록이 없습니다.</p>
+        )}
+      </div>
     </div>
   );
 }

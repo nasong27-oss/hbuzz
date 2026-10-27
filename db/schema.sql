@@ -129,3 +129,10 @@ CREATE TABLE IF NOT EXISTS diagnostics (
   results  JSONB NOT NULL
 );
 CREATE INDEX IF NOT EXISTS diagnostics_env_idx ON diagnostics (env, ran_at DESC);
+
+-- 관리자 설정(분류 경로·모델 등). Mac·클라우드가 실행 시작 때 읽는다. 없으면 Mac .env 값.
+CREATE TABLE IF NOT EXISTS settings (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

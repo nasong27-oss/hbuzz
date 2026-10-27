@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { parseEmails, SENDER, sendMail } from "@/lib/mail";
 import { diagnoseToday, sendAlert } from "@/lib/alert";
+import { isMode, isModel, saveSetting } from "@/lib/settings";
 
 const back = (tab: string, key: "ok" | "err", msg: string) =>
   redirect(`/admin?tab=${tab}&${key}=${encodeURIComponent(msg)}`);
@@ -147,4 +148,17 @@ export async function sendTestAlert() {
     if (e && typeof e === "object" && "digest" in e) throw e; // redirect 통과
     back("ops", "err", `테스트 알림 실패: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+// ── 분류 설정 ─────────────────────────────────────────
+
+export async function saveClassifierSettings(fd: FormData) {
+  await requireRole("admin");
+  const mode = fd.get("mode");
+  const model = fd.get("model");
+  if (!isMode(mode) || !isModel(model)) back("classifier", "err", "허용되지 않은 값입니다.");
+  await saveSetting("classifier_mode", String(mode));
+  await saveSetting("claude_model", String(model));
+  revalidatePath("/admin");
+  back("classifier", "ok", "저장했습니다. 집 Mac의 다음 실행(수집 요청은 5분 안, 아침 리포트는 내일 07:30)부터 적용됩니다.");
 }

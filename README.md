@@ -167,7 +167,9 @@ cd ~/hbuzz/collector && .venv/bin/python main.py --dry-run --no-dedupe
 - 구독 경로가 실패하면(로그인 만료·한도 소진) 그 실행의 나머지는 API 키로 간다. 그날 대시보드에 경고가 뜨고,
   운영 탭 최근 실행에 경로별 호출 수(구독 n, API 키 n)가 나온다.
 - 클라우드 백업(Vercel)은 로그인이 없어 API 키만 쓴다.
-- `.env`의 `CLASSIFIER`로 `auto`(기본) / `claude-code` / `api` 를 고를 수 있다.
+- **관리 > 분류 설정**에서 경로(구독 우선 / 구독만 / API 키만)와 모델(Opus·Sonnet·Haiku 5.5)을 바꾼다.
+  Mac은 실행마다 이 값을 읽으므로 저장 즉시 다음 실행부터 적용된다. 저장 전이거나 DB가 안 되면 Mac `.env`의
+  `CLASSIFIER`·`CLAUDE_MODEL`을 쓴다.
 - Vercel·Neon·Gmail: 무료 티어 범위.
 
 > 참고: Anthropic은 Pro/Max 한도가 개인의 통상적 사용을 전제로 한다고 밝힌다.

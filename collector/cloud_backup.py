@@ -120,6 +120,8 @@ def run_backup(send=False, force=False):
     if not had_diag:
         extra["진단 없음"] = "클라우드 진단 기록이 없어 모든 사이트를 시도했습니다."
 
+    db.apply_runtime_settings()  # 모델은 관리자 설정을 따른다
+    os.environ["CLASSIFIER"] = "api"  # 클라우드에는 구독 로그인이 없어 경로 설정과 무관하게 API 키
     classify.reset_stats()
     run_id = db.run_start("cloud")
     t0 = time.time()

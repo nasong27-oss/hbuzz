@@ -95,6 +95,33 @@ def resolve_recipients():
     return config.REPORT_TO
 
 
+# 관리자 분류 설정 — 웹 관리 > 분류 설정. 허용값만 받는다(웹과 같은 목록).
+CLASSIFIER_MODES = ("auto", "claude-code", "api")
+CLAUDE_MODELS = ("claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5")
+
+
+@_safe("설정 조회", default={})
+def get_settings():
+    with _connect() as conn:
+        rows = conn.execute("SELECT key, value FROM settings").fetchall()
+    return {k: v for k, v in rows}
+
+
+def apply_runtime_settings():
+    """DB 설정을 이번 실행에 적용한다. DB 가 없거나 값이 이상하면 .env 값을 그대로 둔다."""
+    s = get_settings() or {}
+    mode, model = s.get("classifier_mode"), s.get("claude_model")
+    used = []
+    if mode in CLASSIFIER_MODES:
+        os.environ["CLASSIFIER"] = mode
+        used.append("경로")
+    if model in CLAUDE_MODELS:
+        config.CLAUDE_MODEL = model
+        used.append("모델")
+    print(f"[설정] 분류 경로={os.environ.get('CLASSIFIER', 'auto')} 모델={config.CLAUDE_MODEL}"
+          + (f" (DB: {', '.join(used)})" if used else " (.env)"))
+
+
 # ---------------------------------------------------------------------------
 # 실행 이력(runs)
 # ---------------------------------------------------------------------------

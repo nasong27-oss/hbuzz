@@ -86,6 +86,7 @@ def main():
         print("[조회] 데일리 생성 잡 실행 중 — 이번 회차 건너뜀")
         return
     db.requeue_stale(60)
+    db.apply_runtime_settings()
     for _ in range(MAX_PER_RUN):
         req = db.claim_query()
         if not req:

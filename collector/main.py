@@ -144,6 +144,7 @@ def save_seen_news(keys):
 
 def main():
     """실행 이력(runs)을 DB에 남기며 파이프라인을 돌린다. DB 실패는 파이프라인을 막지 않는다."""
+    db.apply_runtime_settings()  # 관리자 화면의 분류 경로·모델
     classify.reset_stats()
     run_id = db.run_start("generate")
     try:
