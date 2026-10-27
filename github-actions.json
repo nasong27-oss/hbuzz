@@ -1,0 +1,176 @@
+{
+ "env": "github-actions",
+ "ran_at": "2026-10-27T02:28:36+00:00",
+ "keyword": "현대카드",
+ "elapsed": 150.0,
+ "results": {
+  "82cook": {
+   "status": "ok",
+   "detail": "",
+   "count": 10,
+   "secs": 3.0,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 433
+  },
+  "MLBPARK": {
+   "status": "ok",
+   "detail": "",
+   "count": 30,
+   "secs": 3.5,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 1
+  },
+  "구글뉴스": {
+   "status": "ok",
+   "detail": "",
+   "count": 1,
+   "secs": 2.5,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 1
+  },
+  "구글플레이": {
+   "status": "ok",
+   "detail": "",
+   "count": 40,
+   "secs": 0.2,
+   "requests": 0,
+   "http": [],
+   "newest_days": 1
+  },
+  "네이버카페": {
+   "status": "timeout",
+   "detail": "150초 안에 끝나지 않음",
+   "count": 0,
+   "secs": 150,
+   "requests": 0,
+   "http": [],
+   "newest_days": null
+  },
+  "네이트판": {
+   "status": "ok",
+   "detail": "",
+   "count": 10,
+   "secs": 2.9,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 442
+  },
+  "더쿠": {
+   "status": "unknown",
+   "detail": "요청 기록 없음(외부 라이브러리 경로이거나 비활성 수집기)",
+   "count": 0,
+   "secs": 0.0,
+   "requests": 0,
+   "http": [],
+   "newest_days": null
+  },
+  "디시갤러리": {
+   "status": "ok",
+   "detail": "",
+   "count": 144,
+   "secs": 57.8,
+   "requests": 17,
+   "http": [
+    200
+   ],
+   "newest_days": 0
+  },
+  "디시인사이드": {
+   "status": "ok",
+   "detail": "",
+   "count": 125,
+   "secs": 15.4,
+   "requests": 5,
+   "http": [
+    200
+   ],
+   "newest_days": 0
+  },
+  "루리웹": {
+   "status": "ok",
+   "detail": "",
+   "count": 55,
+   "secs": 3.2,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 1
+  },
+  "보배드림": {
+   "status": "ok",
+   "detail": "",
+   "count": 10,
+   "secs": 4.4,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 7
+  },
+  "뽐뿌": {
+   "status": "ok",
+   "detail": "",
+   "count": 20,
+   "secs": 3.3,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 0
+  },
+  "앱스토어": {
+   "status": "ok",
+   "detail": "",
+   "count": 40,
+   "secs": 0.1,
+   "requests": 0,
+   "http": [],
+   "newest_days": 1
+  },
+  "오늘의유머": {
+   "status": "blocked",
+   "detail": "HTTP 403",
+   "count": 0,
+   "secs": 2.3,
+   "requests": 1,
+   "http": [
+    403
+   ],
+   "newest_days": null
+  },
+  "와이고수": {
+   "status": "empty",
+   "detail": "응답은 정상, 결과 0건(구조 변경 또는 실제 0건)",
+   "count": 0,
+   "secs": 2.9,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": null
+  },
+  "클리앙": {
+   "status": "ok",
+   "detail": "",
+   "count": 18,
+   "secs": 2.9,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 5
+  }
+ }
+}
