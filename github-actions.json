@@ -1,14 +1,14 @@
 {
  "env": "github-actions",
- "ran_at": "2026-10-27T02:34:24+00:00",
+ "ran_at": "2026-10-27T02:36:51+00:00",
  "keyword": "현대카드",
- "elapsed": 150.0,
+ "elapsed": 54.0,
  "results": {
   "82cook": {
    "status": "ok",
    "detail": "",
    "count": 10,
-   "secs": 2.9,
+   "secs": 2.8,
    "requests": 1,
    "http": [
     200
@@ -19,7 +19,7 @@
    "status": "ok",
    "detail": "",
    "count": 30,
-   "secs": 3.5,
+   "secs": 3.4,
    "requests": 1,
    "http": [
     200
@@ -41,25 +41,27 @@
    "status": "ok",
    "detail": "",
    "count": 40,
-   "secs": 0.2,
+   "secs": 0.3,
    "requests": 0,
    "http": [],
    "newest_days": 1
   },
   "네이버카페": {
-   "status": "timeout",
-   "detail": "150초 안에 끝나지 않음",
-   "count": 0,
-   "secs": 150,
-   "requests": 0,
-   "http": [],
-   "newest_days": null
+   "status": "ok",
+   "detail": "",
+   "count": 30,
+   "secs": 3.2,
+   "requests": 1,
+   "http": [
+    200
+   ],
+   "newest_days": 0
   },
   "네이트판": {
    "status": "ok",
    "detail": "",
    "count": 10,
-   "secs": 4.5,
+   "secs": 2.8,
    "requests": 1,
    "http": [
     200
@@ -79,7 +81,7 @@
    "status": "ok",
    "detail": "",
    "count": 144,
-   "secs": 57.3,
+   "secs": 54.0,
    "requests": 17,
    "http": [
     200
@@ -90,7 +92,7 @@
    "status": "ok",
    "detail": "",
    "count": 125,
-   "secs": 15.4,
+   "secs": 14.4,
    "requests": 5,
    "http": [
     200
@@ -101,7 +103,7 @@
    "status": "ok",
    "detail": "",
    "count": 55,
-   "secs": 3.0,
+   "secs": 2.9,
    "requests": 1,
    "http": [
     200
@@ -112,7 +114,7 @@
    "status": "ok",
    "detail": "",
    "count": 10,
-   "secs": 4.3,
+   "secs": 4.2,
    "requests": 1,
    "http": [
     200
@@ -123,7 +125,7 @@
    "status": "ok",
    "detail": "",
    "count": 20,
-   "secs": 3.3,
+   "secs": 3.2,
    "requests": 1,
    "http": [
     200
@@ -134,7 +136,7 @@
    "status": "ok",
    "detail": "",
    "count": 40,
-   "secs": 0.2,
+   "secs": 0.4,
    "requests": 0,
    "http": [],
    "newest_days": 1
@@ -154,7 +156,7 @@
    "status": "empty",
    "detail": "응답은 정상, 결과 0건(구조 변경 또는 실제 0건)",
    "count": 0,
-   "secs": 2.9,
+   "secs": 2.8,
    "requests": 1,
    "http": [
     200
@@ -165,7 +167,7 @@
    "status": "ok",
    "detail": "",
    "count": 18,
-   "secs": 2.9,
+   "secs": 2.8,
    "requests": 1,
    "http": [
     200
