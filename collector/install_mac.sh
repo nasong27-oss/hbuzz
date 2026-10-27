@@ -51,6 +51,16 @@ PY
   chmod 600 .env
 fi
 
+say "2.5/5 분류 경로 점검 (Claude Code 구독 → 실패 시 API 키)"
+if [ -z "$(command -v claude || ls "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" /opt/homebrew/bin/claude 2>/dev/null | head -1)" ]; then
+  echo "⚠ Claude Code 가 없습니다. 설치 후 터미널에서 'claude' 를 한 번 실행해 구독 계정으로 로그인하세요."
+  echo "  그 전까지는 API 키로 분류합니다."
+else
+  echo "Claude Code 로 1회 분류 점검 중(최대 1~2분)…"
+  .venv/bin/python -c "import classify; print(classify.selftest())" || true
+  echo "  '실패'면 터미널에서 'claude' 실행 → 로그인 후 이 스크립트를 다시 실행하세요. 그동안은 API 키로 분류합니다."
+fi
+
 say "3/5 DB 연결 확인·테이블 생성"
 if grep -qE '^DATABASE_URL=.+' .env; then
   .venv/bin/python db.py init || echo "⚠ DB 연결 실패 — .env 의 DATABASE_URL 확인 후 '.venv/bin/python db.py init' 재실행"

@@ -9,15 +9,23 @@
   - reason      (str)  : 판단 근거 한 문장 (한국어)
   - score       (int)  : 정렬용. 부정=-1, 중립=0, 긍정=1
 
-응답은 tool use(강제 도구 호출)로 받아 JSON 스키마를 보장한다 — 텍스트 파싱 실패가 없다.
-SDK 의존성을 늘리지 않으려고 requests 로 REST 를 직접 호출한다.
+분류 경로 (CLASSIFIER 환경변수, 기본 auto)
+  1) claude-code : 집 Mac 에 로그인된 Claude Code(본인 구독)를 `claude -p --json-schema` 로 호출
+                   → API 종량 과금 없이 구독 사용량으로 처리
+  2) api         : Anthropic Messages API(본인 API 키), tool use 강제 호출로 스키마 보장
+  auto = 1 → 실패 시 2. 구독 경로가 한 번 실패하면(로그인 만료·사용량 한도 등) 그 실행의
+  나머지는 바로 API 로 간다(배치마다 느린 실패를 반복하지 않게).
+  모델은 두 경로 모두 CLAUDE_MODEL(기본 claude-sonnet-5-5).
 
-ANTHROPIC_API_KEY 가 없거나 호출이 실패하면 sentiment.py 키워드 분류로
-graceful fallback 하므로 파이프라인이 절대 hard-fail 하지 않는다.
-폴백이 발생하면 STATS["fallback"] 에 집계돼 리포트·대시보드에 표시된다.
+둘 다 실패하면 sentiment.py 키워드 분류로 graceful fallback 하므로 파이프라인이 절대 hard-fail
+하지 않는다. 경로별 호출 수·폴백은 STATS 에 집계돼 리포트·대시보드에 표시된다.
 """
 import json
-
+import os
+import shutil
+import subprocess
+import tempfile
+import threading
 import time
 
 import requests
@@ -33,15 +41,134 @@ REQUEST_TIMEOUT = 90
 API_RETRIES = 4
 API_BACKOFF = 5  # 초 (5,10,15)
 
+CC_TIMEOUT = 240  # claude -p 1회 최대 대기(초)
+_CC_SEARCH = ("~/.local/bin", "~/.claude/local", "/opt/homebrew/bin", "/usr/local/bin")
+
 # 실행 단위 통계 — main.py 가 읽어 run 로그(DB)와 리포트에 남긴다.
-STATS = {"calls": 0, "fallback": 0, "input_tokens": 0, "output_tokens": 0, "errors": []}
+STATS = {}
+_lock = threading.Lock()
+_cc_broken = {"reason": None}  # 회로차단: 이번 실행에서 구독 경로가 실패하면 기록
 
 
 def reset_stats():
-    STATS.update({"calls": 0, "fallback": 0, "input_tokens": 0, "output_tokens": 0, "errors": []})
+    STATS.clear()
+    STATS.update({"calls": 0, "fallback": 0, "input_tokens": 0, "output_tokens": 0, "errors": [],
+                  "via": {"claude-code": 0, "api": 0}, "cc_cost_usd": 0.0, "cc_disabled": None})
+    _cc_broken["reason"] = None
+
+
+reset_stats()
+
+
+def _err(msg):
+    with _lock:
+        if msg not in STATS["errors"]:
+            STATS["errors"].append(msg[:300])
+
+
+def claude_bin():
+    """Claude Code 실행 파일 경로. launchd 는 PATH 가 짧아 흔한 설치 위치도 직접 찾는다."""
+    explicit = os.environ.get("CLAUDE_BIN")
+    if explicit and os.path.exists(explicit):
+        return explicit
+    found = shutil.which("claude")
+    if found:
+        return found
+    for d in _CC_SEARCH:
+        p = os.path.join(os.path.expanduser(d), "claude")
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _mode():
+    m = (os.environ.get("CLASSIFIER") or "auto").strip().lower()
+    return m if m in ("auto", "claude-code", "api") else "auto"
+
+
+def _call_claude_code(system, prompt, schema):
+    """claude -p 로 구조화 출력을 받는다(구독 로그인 사용). 실패 시 예외."""
+    exe = claude_bin()
+    if not exe:
+        raise RuntimeError("Claude Code(claude) 실행 파일을 찾지 못함")
+    # 빈 임시 폴더에서 실행: 프로젝트 설정·CLAUDE.md·MCP 가 섞이지 않게.
+    # --bare 는 구독 로그인을 읽지 않으므로 쓰지 않는다(공식 문서).
+    cmd = [exe, "-p", "--output-format", "json", "--json-schema", json.dumps(schema, ensure_ascii=False),
+           "--model", config.CLAUDE_MODEL, "--permission-mode", "dontAsk",
+           # 분류에는 도구·MCP·스킬이 필요 없다. 끄면 요청마다 붙는 도구 정의가 빠져 구독 사용량이 크게 준다.
+           "--tools", "", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence",
+           "--system-prompt", system + "\n결과는 도구 이름과 무관하게, 주어진 JSON 스키마 형식의 최종 구조화 출력으로 제출한다."]
+    env = dict(os.environ)
+    env.pop("ANTHROPIC_API_KEY", None)  # 키가 있으면 Claude Code 가 API 과금으로 갈 수 있어 제거
+    with tempfile.TemporaryDirectory(prefix="hbuzz-cc-") as cwd:
+        try:
+            r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=cwd, env=env,
+                               timeout=CC_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"claude -p {CC_TIMEOUT}초 초과")
+    out = (r.stdout or "").strip()
+    try:
+        data = json.loads(out.splitlines()[-1] if out else "{}")
+    except ValueError:
+        raise RuntimeError(f"claude -p 응답 해석 실패(exit {r.returncode}): {(out or r.stderr)[:200]}")
+    if r.returncode != 0 or data.get("is_error"):
+        raise RuntimeError(f"claude -p 실패(exit {r.returncode}): {str(data.get('result') or r.stderr)[:200]}")
+    so = data.get("structured_output")
+    if not isinstance(so, dict):
+        raise RuntimeError("claude -p 응답에 structured_output 없음")
+    usage = data.get("usage") or {}
+    with _lock:
+        STATS["via"]["claude-code"] += 1
+        STATS["calls"] += 1
+        STATS["input_tokens"] += sum(int(usage.get(k) or 0) for k in
+                                     ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+        STATS["output_tokens"] += int(usage.get("output_tokens") or 0)
+        STATS["cc_cost_usd"] = round(STATS["cc_cost_usd"] + float(data.get("total_cost_usd") or 0), 4)
+    return so
+
+
+def selftest():
+    """설치 점검용: 구독 경로가 이 환경에서 실제로 되는지 1회 호출로 확인."""
+    exe = claude_bin()
+    if not exe:
+        return "실패: Claude Code(claude)가 설치돼 있지 않습니다"
+    try:
+        out = _call_claude_code("ok 를 true 로 제출한다.", "점검",
+                                {"type": "object", "properties": {"ok": {"type": "boolean"}},
+                                 "required": ["ok"]})
+        return f"성공: {exe} (구독 로그인 사용, 모델 {config.CLAUDE_MODEL})" if out.get("ok") else "실패: 응답 이상"
+    except Exception as e:  # noqa: BLE001
+        return f"실패: {e}"
+
+
+def ai_available():
+    """구독(Claude Code) 또는 API 키 중 하나라도 쓸 수 있는가."""
+    mode = _mode()
+    cc = mode in ("auto", "claude-code") and claude_bin() is not None
+    api = mode in ("auto", "api") and bool(config.ANTHROPIC_API_KEY)
+    return cc or api
 
 
 def call_claude(system, prompt, tool_name, tool_desc, schema, max_tokens=4096):
+    """schema 에 맞는 dict 를 돌려준다. 구독(Claude Code) → API 키 순서. 둘 다 실패 시 예외."""
+    mode = _mode()
+    if mode in ("auto", "claude-code") and not _cc_broken["reason"]:
+        try:
+            return _call_claude_code(system, prompt, schema)
+        except Exception as e:  # noqa: BLE001
+            reason = f"Claude Code(구독) 실패 → {'API 로 전환' if mode == 'auto' else '중단'}: {e}"
+            _cc_broken["reason"] = reason
+            STATS["cc_disabled"] = reason[:300]
+            _err(reason)
+            print(f"[분류] {reason}")
+            if mode == "claude-code":
+                raise
+    elif mode == "claude-code":
+        raise RuntimeError(_cc_broken["reason"] or "Claude Code 경로 비활성")
+    return _call_api(system, prompt, tool_name, tool_desc, schema, max_tokens)
+
+
+def _call_api(system, prompt, tool_name, tool_desc, schema, max_tokens=4096):
     """도구 호출을 강제해 schema 에 맞는 dict 를 돌려준다. 실패 시 예외."""
     if not config.ANTHROPIC_API_KEY:
         raise RuntimeError("ANTHROPIC_API_KEY 미설정")
@@ -62,7 +189,8 @@ def call_claude(system, prompt, tool_name, tool_desc, schema, max_tokens=4096):
     last_err = None
     for attempt in range(1, API_RETRIES + 1):
         try:
-            STATS["calls"] += 1
+            with _lock:
+                STATS["calls"] += 1
             resp = requests.post(API_URL, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
             # 429(레이트리밋)·529(과부하)·5xx 는 일시적 → 재시도
             if resp.status_code in (429, 500, 502, 503, 504, 529):
@@ -72,8 +200,10 @@ def call_claude(system, prompt, tool_name, tool_desc, schema, max_tokens=4096):
                 raise RuntimeError(f"{resp.status_code}: {resp.text[:200]}")
             data = resp.json()
             usage = data.get("usage") or {}
-            STATS["input_tokens"] += int(usage.get("input_tokens") or 0)
-            STATS["output_tokens"] += int(usage.get("output_tokens") or 0)
+            with _lock:
+                STATS["via"]["api"] += 1
+                STATS["input_tokens"] += int(usage.get("input_tokens") or 0)
+                STATS["output_tokens"] += int(usage.get("output_tokens") or 0)
             for block in data.get("content") or []:
                 if block.get("type") == "tool_use" and block.get("name") == tool_name:
                     return block.get("input") or {}
@@ -85,9 +215,7 @@ def call_claude(system, prompt, tool_name, tool_desc, schema, max_tokens=4096):
             last_err = e
             if attempt < API_RETRIES:
                 time.sleep(API_BACKOFF * attempt)
-    msg = f"{type(last_err).__name__}: {last_err}"
-    if msg not in STATS["errors"]:
-        STATS["errors"].append(msg[:300])
+    _err(f"API {type(last_err).__name__}: {last_err}")
     raise last_err
 
 
@@ -330,7 +458,7 @@ def curate_news(entries):
     (입력과 동수·동순). 실패 시 전부 relevant=True·ko=원제목(과도한 탈락 방지)."""
     entries = list(entries or [])
     fallback = [{"relevant": True, "ko": e.get("title", "")} for e in entries]
-    if not entries or not config.ANTHROPIC_API_KEY:
+    if not entries or not ai_available():
         return fallback
     payload = [{"idx": i, "t": e.get("title", ""), "src": e.get("press", ""),
                 "foreign": bool(e.get("foreign"))} for i, e in enumerate(entries)]
@@ -361,9 +489,9 @@ def annotate(items, batch_size=BATCH_SIZE, workers=1):
     if not items:
         return items
 
-    if not config.ANTHROPIC_API_KEY:
+    if not ai_available():
         for it in items:
-            _fallback_one(it, note="API 키 미설정(폴백)")
+            _fallback_one(it, note="AI 분류 경로 없음(폴백)")
             it["fallback"] = True
         STATS["fallback"] += len(items)
         return items
@@ -449,7 +577,7 @@ def summarize_issues(consumer):
     if not consumer:
         return {"부정": [], "긍정": [], "중립": []}
 
-    if not config.ANTHROPIC_API_KEY:
+    if not ai_available():
         return _fallback_summary(consumer)
 
     payload = [

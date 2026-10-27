@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "api"))
 os.environ["AUTH_SECRET"] = "unit-test-secret-123456"
 os.environ["HBUZZ_DATA_DIR"] = "/tmp/hbuzz-test"
 
+os.environ["CLASSIFIER"] = "api"
 import config  # noqa: E402
 import cloud as api_cloud  # noqa: E402  (api/cloud.py — collector 에는 cloud.py 가 없어 충돌 없음)
 import collectors  # noqa: E402

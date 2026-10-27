@@ -321,7 +321,15 @@ type Run = {
   started_at: string;
   finished_at: string | null;
   sources: Record<string, { count: number; secs: number; tries: number; error?: string }>;
-  claude: { calls?: number; fallback?: number; input_tokens?: number; output_tokens?: number; errors?: string[] };
+  claude: {
+    calls?: number;
+    fallback?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    errors?: string[];
+    via?: { "claude-code"?: number; api?: number };
+    cc_cost_usd?: number;
+  };
   summary: Record<string, unknown>;
   error: string | null;
 };
@@ -477,7 +485,7 @@ async function Ops() {
         <div className="panel stack">
           <h2 style={{ margin: 0 }}>집 Mac 일정</h2>
           <ul style={{ margin: 0, paddingLeft: 18 }} className="small">
-            <li>07:30 리포트 생성 (수집, Claude 분류)</li>
+            <li>07:30 리포트 생성 (수집, Claude 분류: 구독 우선, 실패 시 API 키)</li>
             <li>08:00 아침 메일 발송</li>
             <li>5분마다 웹 수집 요청 처리</li>
           </ul>
@@ -560,7 +568,11 @@ async function Ops() {
                           </summary>
                           {r.claude?.calls ? (
                             <p style={{ margin: "8px 0" }}>
-                              Claude 호출 {r.claude.calls}회, 입력 {r.claude.input_tokens?.toLocaleString()} / 출력{" "}
+                              Claude 호출 {r.claude.calls}회
+                              {r.claude.via
+                                ? ` (구독 ${r.claude.via["claude-code"] ?? 0}, API 키 ${r.claude.via.api ?? 0})`
+                                : ""}
+                              , 입력 {r.claude.input_tokens?.toLocaleString()} / 출력{" "}
                               {r.claude.output_tokens?.toLocaleString()} 토큰
                               {r.claude.errors?.length ? ` (오류: ${r.claude.errors.join("; ")})` : ""}
                             </p>

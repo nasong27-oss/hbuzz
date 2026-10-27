@@ -336,6 +336,8 @@ def run_pipeline(collect=None, cloud=False, send=None, extra_errors=None):
         "fallback": classify.STATS["fallback"], "news": len(news or []),
         "model": config.CLAUDE_MODEL,
         "backup": bool(cloud),
+        "classifier_via": dict(classify.STATS.get("via") or {}),
+        "cc_disabled": classify.STATS.get("cc_disabled"),
     }
     if cloud and db.primary_report_exists(today):
         # 백업이 도는 사이 Mac 리포트가 먼저 들어왔으면 덮어쓰지도, 보내지도 않는다

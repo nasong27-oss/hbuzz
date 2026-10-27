@@ -8,6 +8,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.environ["CLASSIFIER"] = "api"
 import config  # noqa: E402
 
 TODAY = datetime.date.today()

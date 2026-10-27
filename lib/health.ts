@@ -30,10 +30,17 @@ export async function healthWarnings(): Promise<Warning[]> {
     out.push({ level: "err", text: `마지막 리포트 생성이 실패했습니다: ${lastGen.error ?? "원인 미상"}` });
   }
 
-  const fb = await q1<{ fallback: number }>(
-    `SELECT COALESCE((stats->>'fallback')::int, 0) AS fallback FROM reports WHERE report_date=$1`,
+  const fb = await q1<{ fallback: number; cc_disabled: string | null }>(
+    `SELECT COALESCE((stats->>'fallback')::int, 0) AS fallback, stats->>'cc_disabled' AS cc_disabled
+     FROM reports WHERE report_date=$1`,
     [today],
   );
+  if (fb?.cc_disabled) {
+    out.push({
+      level: "warn",
+      text: `오늘은 Claude Code 구독 분류가 실패해 API 키로 분류했습니다(과금 발생). 원인: ${fb.cc_disabled.slice(0, 160)}`,
+    });
+  }
   if (fb && fb.fallback > 0) {
     out.push({
       level: "warn",

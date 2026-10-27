@@ -157,11 +157,22 @@ cd ~/hbuzz/collector && .venv/bin/python main.py --dry-run --no-dedupe
 
 ---
 
-## 비용
+## 분류 경로와 비용
 
-- Claude API: 하루 1회 분류(수십~수백 건) + 수집 요청 처리분. 실제 사용량은 관리 > 운영의 토큰 수로 확인.
-  모델은 Mac `.env`의 `CLAUDE_MODEL`로 바꿀 수 있다.
+집 Mac은 **Claude Code(본인 구독)를 먼저** 쓰고, 실패하면 **API 키**로, 둘 다 안 되면 키워드 규칙으로 분류한다.
+모델은 두 경로 모두 `claude-sonnet-5-5`.
+
+- 구독 경로는 Mac에서 `claude`를 한 번 실행해 로그인해 두면 된다. 호출은 도구·MCP를 끈 `claude -p --json-schema`로
+  해 구독 사용량을 아낀다. 구독의 사용량 한도를 평소 Claude 사용과 함께 쓴다.
+- 구독 경로가 실패하면(로그인 만료·한도 소진) 그 실행의 나머지는 API 키로 간다. 그날 대시보드에 경고가 뜨고,
+  운영 탭 최근 실행에 경로별 호출 수(구독 n, API 키 n)가 나온다.
+- 클라우드 백업(Vercel)은 로그인이 없어 API 키만 쓴다.
+- `.env`의 `CLASSIFIER`로 `auto`(기본) / `claude-code` / `api` 를 고를 수 있다.
 - Vercel·Neon·Gmail: 무료 티어 범위.
+
+> 참고: Anthropic은 Pro/Max 한도가 개인의 통상적 사용을 전제로 한다고 밝힌다.
+> 업무 리포트에 개인 구독을 쓰는 것이 약관상 괜찮은지는 직접 판단할 것
+> ([Claude Code 법률·컴플라이언스](https://code.claude.com/docs/en/legal-and-compliance)).
 
 ## 개발
 
