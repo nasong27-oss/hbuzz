@@ -21,10 +21,13 @@ jobs:
         run: pip install -q -r collector/requirements.txt
       - name: 진단 실행
         working-directory: collector
+        timeout-minutes: 5
         env:
           TZ: Asia/Seoul
+          # 레포 Secrets 에 DATABASE_URL 을 넣어 두면 결과가 웹 운영 탭에도 저장된다(없으면 건너뜀)
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python diag.py --env github-actions --out /tmp/github-actions.json --timeout 150 | tee /tmp/diag.txt
+          python diag.py --env github-actions --out /tmp/github-actions.json --timeout 150 --save-db | tee /tmp/diag.txt
           { echo '```'; grep -A40 '^\[github-actions\]' /tmp/diag.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: 결과 저장(diag-results 브랜치)
         run: |

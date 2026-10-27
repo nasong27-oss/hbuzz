@@ -156,12 +156,21 @@ def main():
                   claude=classify.STATS, summary=summary)
 
 
-def run_pipeline():
-    dry_run = "--dry-run" in sys.argv
-    no_dedupe = "--no-dedupe" in sys.argv
+def run_pipeline(collect=None, cloud=False, send=None, extra_errors=None):
+    """데일리 파이프라인.
+
+    collect: 수집 함수 교체(클라우드 백업은 병렬·시간제한 수집기를 넘긴다)
+    cloud:   클라우드 백업 모드 — 중복 제거·챗봇 이력·뉴스 중복을 로컬 파일 대신 DB 기준으로,
+             제목에 '백업' 표시, 발송 이력 kind='backup'
+    send:    None 이면 CLI 인자(--dry-run)로 결정, True/False 로 강제 가능
+    """
+    dry_run = ("--dry-run" in sys.argv) if send is None else (not send)
+    no_dedupe = "--no-dedupe" in sys.argv and not cloud
 
     keywords = db.resolve_keywords()
-    items, errors = collectors.collect_all(keywords)
+    items, errors = (collect or collectors.collect_all)(keywords)
+    if extra_errors:
+        errors = dict(errors, **extra_errors)
 
     # 1) 관련성 사전 필터: '현대카드'(공백 허용) 또는 '현카'가 실제로 나오는 글만 남긴다.
     items, dropped_irrelevant = collectors.filter_relevant(items)
@@ -192,6 +201,8 @@ def run_pipeline():
 
     # 2) 링크 기준 중복 제거 (실행 간 + 실행 내)
     seen = load_seen()
+    if cloud:  # 클라우드는 seen.json 이 없으므로 최근 리포트에 실린 링크를 DB 에서 가져온다
+        seen = seen + db.recent_report_links(days=21)
     seen_set = set(seen)
     new_items, batch = [], set()
     for it in items:
@@ -206,7 +217,7 @@ def run_pipeline():
     # 3) Claude Haiku 분류 (실패 시 sentiment.py 키워드 분류로 폴백)
     #  분류 대상은 '거친 30일 사전 드롭 + 중복 제거'를 거친 집합이다(코스트/볼륨 가드).
     n_classified = len(new_items)
-    classify.annotate(new_items)
+    classify.annotate(new_items, workers=3 if cloud else 1)
 
     # 3.5) 앱 스토어 리뷰(구글플레이/앱스토어)는 정의상 '현대카드 앱'에 대한 소비자여론이다.
     #  리뷰 본문에 '현대카드'가 없어 분류기가 relevant=False/app_related=False 로 볼 수 있으므로,
@@ -268,11 +279,13 @@ def run_pipeline():
 
     # 6.5) 챗봇 섹션은 항상 표시(팀장 핵심 주제). 오늘 챗봇 0건이면 '가장 최근 이력' 날짜를
     #  아카이브에서 뽑아 함께 보여준다. 마스킹 이후에 계산해 표시 파이프라인을 건드리지 않는다.
-    chatbot_last_date = latest_chatbot_date()
+    chatbot_last_date = latest_chatbot_date() or (db.latest_chatbot_date() if cloud else None)
 
     # 6.6) 결제·챗봇 중심 금융 뉴스(소비자 여론과 별개, 리포트 앞 별도 섹션). 실패해도 무시.
     #  이미 내보낸 뉴스(seen_news)는 제외해 날짜가 넘어가도 겹치지 않게 한다.
     seen_news = load_seen_news()
+    if cloud:
+        seen_news = seen_news + [collectors._news_key(t) for t in db.recent_news_titles(days=14)]
     news = collectors.finance_news(seen=set(seen_news))
     if news:
         print(f"금융 뉴스 {len(news)}건 수집")
@@ -313,7 +326,8 @@ def run_pipeline():
         print("수집 실패:", errors)
 
     neg = sum(1 for i in consumer if i["sentiment"] == "부정")
-    subject = f"[버즈리포트] {today} — 소비자여론 {len(consumer)}건 (부정 {neg})"
+    tag = "[버즈리포트 백업]" if cloud else "[버즈리포트]"
+    subject = f"{tag} {today} — 소비자여론 {len(consumer)}건 (부정 {neg})"
     stats = {
         "final": len(new_items), "consumer": len(consumer), "negative": neg,
         "positive": sum(1 for i in consumer if i["sentiment"] == "긍정"),
@@ -321,7 +335,13 @@ def run_pipeline():
         "dropped_irrelevant": dropped_irrelevant, "dropped_old": dropped_old,
         "fallback": classify.STATS["fallback"], "news": len(news or []),
         "model": config.CLAUDE_MODEL,
+        "backup": bool(cloud),
     }
+    if cloud and db.primary_report_exists(today):
+        # 백업이 도는 사이 Mac 리포트가 먼저 들어왔으면 덮어쓰지도, 보내지도 않는다
+        print("[백업] 집 Mac 리포트가 이미 있어 저장·발송하지 않음")
+        stats["skipped"] = "primary_exists"
+        return stats
     if not no_dedupe:  # 테스트 실행은 DB 리포트를 덮어쓰지 않는다
         db.save_report(today, subject, html_body, text_body, issue_summary, stats, errors,
                        keywords, [it["link"] for it in new_items if it.get("link")], news)
@@ -331,13 +351,16 @@ def run_pipeline():
         try:
             mailer.send(subject, html_body, text_body, to=to)
             print("메일 발송 완료 →", ", ".join(to))
-            db.log_send("daily", subject, to, "success", report_date=today,
+            db.log_send("backup" if cloud else "daily", subject, to, "success", report_date=today,
                         item_count=len(new_items))
         except Exception as e:
             print("메일 발송 실패:", e)
-            db.log_send("daily", subject, to, "failed", error=e, report_date=today)
-
-    if not no_dedupe:
+            db.log_send("backup" if cloud else "daily", subject, to, "failed", error=e,
+                        report_date=today)
+            stats["send_error"] = f"{type(e).__name__}: {e}"
+        else:
+            stats["sent_to"] = len(to)
+    if not no_dedupe and not cloud:
         save_seen(seen + [it["link"] for it in new_items])
     return stats
 

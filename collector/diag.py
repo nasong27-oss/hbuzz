@@ -12,6 +12,7 @@ import argparse
 import concurrent.futures as cf
 import datetime
 import json
+import os
 import sys
 import threading
 import time
@@ -24,11 +25,30 @@ SKIP = {"X"}  # 로그인 필요·상시 실패라 진단 의미 없음
 _local = threading.local()
 
 
+_ERR_KO = [
+    ("ProxyError", "프록시 거부"),
+    ("SSLError", "SSL 오류"),
+    ("ConnectTimeout", "연결 시간 초과"),
+    ("ReadTimeout", "응답 시간 초과"),
+    ("Timeout", "시간 초과"),
+    ("ConnectionError", "연결 실패"),
+]
+
+
+def _short_error(error, host):
+    name = type(error).__name__
+    for key, ko in _ERR_KO:
+        if key in name:
+            return f"{ko} ({host})"
+    return f"{name}: {error}"[:120]
+
+
 def _record(kind, url, status=None, error=None):
     log = getattr(_local, "log", None)
     if log is not None:
-        log.append({"host": urlsplit(url).hostname or "", "status": status,
-                    "error": error and f"{type(error).__name__}: {error}"[:160]})
+        host = urlsplit(url).hostname or ""
+        log.append({"host": host, "status": status,
+                    "error": error and _short_error(error, host)})
 
 
 def _install_recorder():
@@ -178,4 +198,7 @@ if __name__ == "__main__":
             json.dump(rep, f, ensure_ascii=False, indent=1)
     if a.save_db:
         save_db(rep)
-    sys.exit(0)
+    # 응답 없는 사이트의 스레드가 남아 있어도 기다리지 않고 끝낸다
+    # (ThreadPoolExecutor 는 종료 시 모든 작업 스레드를 join 해서 프로세스가 멈출 수 있음)
+    sys.stdout.flush()
+    os._exit(0)

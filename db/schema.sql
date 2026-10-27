@@ -120,3 +120,12 @@ CREATE TABLE IF NOT EXISTS query_request_items (
   item_id   BIGINT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
   PRIMARY KEY (query_id, item_id)
 );
+
+-- 실행 환경별 사이트 수집 진단 결과 (집 Mac / Vercel 서울 / GitHub Actions)
+CREATE TABLE IF NOT EXISTS diagnostics (
+  id       BIGSERIAL PRIMARY KEY,
+  env      TEXT NOT NULL,
+  ran_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  results  JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS diagnostics_env_idx ON diagnostics (env, ran_at DESC);

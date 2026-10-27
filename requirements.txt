@@ -1,0 +1,8 @@
+# Vercel Python 함수(api/cloud.py) 전용 — 클라우드 진단·백업 수집에 필요한 것만.
+# 집 Mac 수집기는 collector/requirements.txt 를 쓴다.
+requests==2.32.5
+beautifulsoup4==4.15.0
+lxml==6.1.1
+google-play-scraper==1.2.7
+app-store-web-scraper==0.2.0
+psycopg[binary]==3.2.10

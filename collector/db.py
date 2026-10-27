@@ -219,6 +219,54 @@ def log_send(kind, subject, recipients, status, error=None, report_date=None, it
 
 
 # ---------------------------------------------------------------------------
+# 클라우드 백업용 조회 (로컬 파일 대신 DB 를 기준으로)
+# ---------------------------------------------------------------------------
+
+@_safe("최근 리포트 링크 조회", default=[])
+def recent_report_links(days=21):
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT link FROM items WHERE report_date >= current_date - %s", (days,)).fetchall()
+    return [r[0] for r in rows]
+
+
+@_safe("최근 뉴스 조회", default=[])
+def recent_news_titles(days=14):
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT title FROM news WHERE report_date >= current_date - %s", (days,)).fetchall()
+    return [r[0] for r in rows]
+
+
+@_safe("챗봇 최근일 조회", default=None)
+def latest_chatbot_date():
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT max(COALESCE(post_date, collected_at::date))::text FROM items "
+            "WHERE category='챗봇'").fetchone()
+    return row[0] if row else None
+
+
+@_safe("리포트 존재 확인", default=False)
+def primary_report_exists(report_date):
+    """백업이 아닌(집 Mac) 리포트가 그 날짜에 이미 있는지."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM reports WHERE report_date=%s "
+            "AND COALESCE((stats->>'backup')::boolean, false) = false", (report_date,)).fetchone()
+    return bool(row)
+
+
+@_safe("최근 진단 조회", default=None)
+def latest_diagnosis(env):
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT results FROM diagnostics WHERE env=%s ORDER BY ran_at DESC LIMIT 1",
+            (env,)).fetchone()
+    return row[0] if row else None
+
+
+# ---------------------------------------------------------------------------
 # 조회 요청 큐
 # ---------------------------------------------------------------------------
 

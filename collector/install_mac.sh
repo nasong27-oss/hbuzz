@@ -101,6 +101,11 @@ if [ "$yn" = "y" ] || [ "$yn" = "Y" ]; then
   sudo pmset -a disablesleep 1 && sudo pmset -a autorestart 1 && echo "적용 완료"
 fi
 
+read -r -p "이 Mac에서 사이트별 수집 진단을 지금 돌릴까요? (2~3분, 웹 운영 탭에 저장) [y/N] " yn
+if [ "$yn" = "y" ] || [ "$yn" = "Y" ]; then
+  .venv/bin/python diag.py --env home-mac --save-db || true
+fi
+
 cat <<EOF
 
 ✅ 설치 끝

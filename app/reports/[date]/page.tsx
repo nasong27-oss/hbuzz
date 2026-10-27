@@ -97,6 +97,12 @@ export default async function ReportPage({
             {String(st.app ?? "–")}건. {fmtDateTime(report.created_at)} 생성
             {st.model ? `, 분류 모델 ${String(st.model)}` : ""}.
           </p>
+          {Boolean(st.backup) && (
+            <div className="flash warn">
+              집 Mac 대신 클라우드에서 만든 백업 리포트입니다. 클라우드에서 막히는 사이트는 빠져 있습니다(아래 수집 문제
+              참고).
+            </div>
+          )}
           {fallbackCount > 0 && (
             <div className="flash warn">
               {fallbackCount}건은 AI 분류 실패로 키워드 규칙이 적용됐습니다. 감성 판단이 덜 정확할 수 있습니다.
@@ -199,7 +205,7 @@ export default async function ReportPage({
                   {sends.map((s) => (
                     <tr key={s.id}>
                       <td style={{ whiteSpace: "nowrap" }}>{fmtDateTime(s.created_at)}</td>
-                      <td>{s.kind === "daily" ? "아침 자동" : "다시 보내기"}</td>
+                      <td>{s.kind === "daily" ? "아침 자동" : s.kind === "backup" ? "클라우드 백업" : "다시 보내기"}</td>
                       <td className="small">{s.recipients.length}명</td>
                       <td>
                         <span className={`status ${s.status}`}>{s.status === "success" ? "성공" : "실패"}</span>

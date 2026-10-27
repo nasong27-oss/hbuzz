@@ -355,7 +355,7 @@ def curate_news(entries):
         return fallback
 
 
-def annotate(items, batch_size=BATCH_SIZE):
+def annotate(items, batch_size=BATCH_SIZE, workers=1):
     """items 를 제자리에서 분류해 relevant/type/sentiment/reason/score 를 채운다.
     폴백된 항목은 it["fallback"]=True 로 표시된다(리포트·대시보드 배지)."""
     if not items:
@@ -368,8 +368,7 @@ def annotate(items, batch_size=BATCH_SIZE):
         STATS["fallback"] += len(items)
         return items
 
-    for i in range(0, len(items), batch_size):
-        chunk = items[i : i + batch_size]
+    def run_chunk(chunk):
         try:
             results = _classify_chunk(chunk)
             for it, res in zip(chunk, results):
@@ -381,6 +380,15 @@ def annotate(items, batch_size=BATCH_SIZE):
                 it["fallback"] = True
             STATS["fallback"] += len(chunk)
 
+    chunks = [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
+    if workers > 1 and len(chunks) > 1:
+        # 클라우드 백업은 실행시간 제한이 있어 배치를 병렬로 보낸다(각 배치는 독립)
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            list(ex.map(run_chunk, chunks))
+    else:
+        for chunk in chunks:
+            run_chunk(chunk)
     return items
 
 

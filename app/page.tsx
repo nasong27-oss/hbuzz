@@ -53,7 +53,7 @@ async function Content() {
     ),
     q<{ d: string; n: number; rcpt: number }>(
       `SELECT report_date AS d, count(*)::int AS n, max(cardinality(recipients))::int AS rcpt
-       FROM send_logs WHERE kind='daily' AND status='success' AND report_date BETWEEN $1 AND $2 GROUP BY 1`,
+       FROM send_logs WHERE kind IN ('daily','backup') AND status='success' AND report_date BETWEEN $1 AND $2 GROUP BY 1`,
       [from, today],
     ),
     healthWarnings(),

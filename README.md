@@ -53,6 +53,7 @@
    | `ADMIN_PASSWORD` | 관리자 비밀번호 (다르게) |
    | `AUTH_SECRET` | 32자 이상 아무 랜덤 문자열 |
    | `GMAIL_APP_PASSWORD` | nasong27@gmail.com 앱 비밀번호 16자리 |
+   | `ANTHROPIC_API_KEY` | Anthropic API 키 (클라우드 백업 수집용) |
 
 4. Deployments > 최신 배포 > **Redeploy** (환경변수 반영)
 5. 사이트 접속 → 관리자 비밀번호로 로그인 → 관리 > 운영 > **DB 초기화** → **테스트 메일 보내기**
@@ -100,6 +101,19 @@ cd ~/hbuzz/collector && .venv/bin/python main.py --dry-run --no-dedupe
 
 권한: 팀 비밀번호는 조회와 **등록된 수신자에게만** 발송, 관리자는 임의 주소 발송과 관리 기능까지.
 메일은 BCC로 나가 수신자끼리 주소가 보이지 않는다.
+
+### 집 Mac이 실패한 날: 클라우드 백업 수집
+
+관리 > 운영 > **지금 클라우드로 수집**. Vercel 서울 서버가 Mac과 같은 수집·분류 코드를 돌려 리포트를 만들고,
+체크하면 아침 수신자에게 발송까지 한다(최대 5분).
+
+- 국내 커뮤니티 일부는 클라우드 IP를 막는다. 그래서 제목에 `[버즈리포트 백업]`, 리포트 상단과 '수집 문제'에
+  빠진 사이트가 표시된다.
+- **클라우드 진단 실행**을 먼저 눌러 두면 막힌 사이트를 건너뛰어 빨리 끝난다. 진단 결과는 집 Mac·Vercel 서울·
+  GitHub Actions를 나란히 비교하는 표로 운영 탭에 나온다.
+  - 집 Mac 진단: 설치 마지막 단계, 또는 `cd ~/hbuzz/collector && .venv/bin/python diag.py --env home-mac --save-db`
+  - GitHub Actions 진단: Actions > 수집 진단 > Run workflow (레포 Secrets에 `DATABASE_URL`을 넣으면 표에도 표시)
+- 같은 날 집 Mac 리포트가 있으면 백업은 실행되지 않고, 백업 후 Mac이 늦게 성공하면 Mac 리포트가 백업을 대체한다.
 
 ### 운영 경고 (대시보드 상단)
 

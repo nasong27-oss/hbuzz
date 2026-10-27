@@ -5,6 +5,8 @@ import { healthWarnings } from "@/lib/health";
 import { mailConfigured, SENDER } from "@/lib/mail";
 import { fmtDateTime } from "@/lib/time";
 import { Flash, Nav } from "@/components/ui";
+import { CloudPanel } from "@/components/CloudPanel";
+import { kstToday } from "@/lib/time";
 import {
   addKeywords,
   addRecipients,
@@ -248,7 +250,12 @@ async function Keywords() {
 
 // ── 발송 이력 ─────────────────────────────────────────
 
-const KIND: Record<string, string> = { daily: "아침 자동", manual: "조회 결과", resend: "리포트 재발송" };
+const KIND: Record<string, string> = {
+  daily: "아침 자동",
+  backup: "클라우드 백업",
+  manual: "조회 결과",
+  resend: "리포트 재발송",
+};
 
 async function Sends() {
   const rows = await q<{
@@ -315,7 +322,86 @@ type Run = {
   error: string | null;
 };
 
-const RUN_KIND: Record<string, string> = { generate: "리포트 생성", send: "아침 발송", query: "수집 요청" };
+const RUN_KIND: Record<string, string> = {
+  generate: "리포트 생성",
+  send: "아침 발송",
+  query: "수집 요청",
+  cloud: "클라우드 백업",
+};
+
+type DiagResult = { status: string; detail: string; count: number; secs: number; http: number[] };
+type DiagRow = { env: string; ran_at: string; results: { results: Record<string, DiagResult> } };
+
+const ENV_LABEL: Record<string, string> = {
+  "home-mac": "집 Mac",
+  "vercel-icn1": "Vercel 서울",
+  "github-actions": "GitHub Actions",
+};
+const DIAG_LABEL: Record<string, [string, string]> = {
+  ok: ["수집됨", "success"],
+  empty: ["0건", "pending"],
+  unknown: ["판단불가", "pending"],
+  blocked: ["차단", "failed"],
+  unreachable: ["접속불가", "failed"],
+  error: ["오류", "failed"],
+  timeout: ["시간초과", "failed"],
+};
+
+function DiagTable({ rows }: { rows: DiagRow[] }) {
+  if (!rows.length)
+    return (
+      <div className="empty-state">
+        아직 진단 기록이 없습니다. 위의 &lsquo;클라우드 진단 실행&rsquo;을 누르면 Vercel 서울에서 사이트별 수집 가능 여부를
+        확인합니다.
+      </div>
+    );
+  const sites = [...new Set(rows.flatMap((r) => Object.keys(r.results.results ?? {})))].sort();
+  return (
+    <div className="table-wrap">
+      <table className="t">
+        <thead>
+          <tr>
+            <th>사이트</th>
+            {rows.map((r) => (
+              <th key={r.env}>
+                {ENV_LABEL[r.env] ?? r.env}
+                <div className="small muted" style={{ fontWeight: 400 }}>
+                  {fmtDateTime(r.ran_at)}
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sites.map((site) => (
+            <tr key={site}>
+              <td style={{ whiteSpace: "nowrap", fontWeight: 600 }}>{site}</td>
+              {rows.map((r) => {
+                const d = r.results.results?.[site];
+                if (!d) return <td key={r.env} className="muted">–</td>;
+                const [label, cls] = DIAG_LABEL[d.status] ?? [d.status, "pending"];
+                return (
+                  <td key={r.env} title={d.detail}>
+                    <span className={`status ${cls}`}>{label}</span>
+                    <span className="small muted">
+                      {" "}
+                      {d.count}건, {d.secs}초
+                    </span>
+                    {d.status !== "ok" && d.detail && (
+                      <div className="small muted" style={{ maxWidth: "36ch" }}>
+                        {d.detail.slice(0, 80)}
+                      </div>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function minutes(a: string, b: string | null) {
   if (!b) return "진행 중";
@@ -324,10 +410,21 @@ function minutes(a: string, b: string | null) {
 }
 
 async function Ops() {
-  const [runs, warnings] = await Promise.all([
+  const [runs, warnings, diags, primary] = await Promise.all([
     q<Run>(`SELECT * FROM runs ORDER BY started_at DESC LIMIT 20`),
     healthWarnings(),
+    q<DiagRow>(
+      `SELECT DISTINCT ON (env) env, ran_at, results FROM diagnostics
+       ORDER BY env, ran_at DESC`,
+    ),
+    q<{ n: number }>(
+      `SELECT count(*)::int AS n FROM reports WHERE report_date = $1
+       AND COALESCE((stats->>'backup')::boolean, false) = false`,
+      [kstToday()],
+    ),
   ]);
+  const envOrder = ["home-mac", "vercel-icn1", "github-actions"];
+  diags.sort((a, b) => envOrder.indexOf(a.env) - envOrder.indexOf(b.env));
   const checks: [string, boolean, string][] = [
     ["데이터베이스", dbConfigured(), "DATABASE_URL"],
     ["메일 발송", mailConfigured(), `GMAIL_APP_PASSWORD (발신 ${SENDER})`],
@@ -381,6 +478,11 @@ async function Ops() {
           </p>
         </div>
       </div>
+
+      <CloudPanel hasPrimaryToday={(primary[0]?.n ?? 0) > 0} hasDiag={diags.some((d) => d.env === "vercel-icn1")} />
+
+      <h2 style={{ marginTop: 12 }}>실행 환경별 수집 진단</h2>
+      <DiagTable rows={diags} />
 
       <h2 style={{ marginTop: 12 }}>최근 실행</h2>
       {runs.length ? (

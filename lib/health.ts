@@ -10,7 +10,7 @@ export async function healthWarnings(): Promise<Warning[]> {
   const today = kstToday();
 
   const sent = await q1<{ n: number }>(
-    `SELECT count(*)::int AS n FROM send_logs WHERE kind='daily' AND status='success' AND report_date=$1`,
+    `SELECT count(*)::int AS n FROM send_logs WHERE kind IN ('daily','backup') AND status='success' AND report_date=$1`,
     [today],
   );
   if (kstNowMinutes() >= 8 * 60 + 5 && !sent?.n) {
@@ -19,7 +19,7 @@ export async function healthWarnings(): Promise<Warning[]> {
       level: "err",
       text: rep?.n
         ? "오늘 리포트는 만들어졌지만 아침 메일 발송 기록이 없습니다. 리포트 화면에서 다시 보낼 수 있습니다."
-        : "오늘 리포트가 아직 없습니다. 집 Mac이 켜져 있고 인터넷에 연결돼 있는지 확인하세요.",
+        : "오늘 리포트가 아직 없습니다. 집 Mac이 켜져 있는지 확인하거나, 관리 > 운영에서 클라우드 백업 수집을 실행하세요.",
     });
   }
 
