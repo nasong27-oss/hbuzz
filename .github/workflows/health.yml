@@ -1,0 +1,28 @@
+# 매일 08:10(KST) 아침 리포트 발송 여부 점검 → 미발송이면 웹이 Gmail 로 경고
+# Vercel 무료 크론은 1시간 단위(08:05~09:04 중 아무 때)라 이 워크플로가 이중화한다.
+# 필요한 레포 설정(Settings > Secrets and variables > Actions):
+#   Secrets:   CRON_SECRET  — Vercel 환경변수 CRON_SECRET 과 같은 값
+#   Variables: HBUZZ_URL    — 사이트 주소(예: https://hbuzz.vercel.app)
+name: 아침 발송 점검
+on:
+  schedule:
+    - cron: "10 23 * * *"   # UTC 23:10 = KST 08:10
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: 점검 호출
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          HBUZZ_URL: ${{ vars.HBUZZ_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$HBUZZ_URL" ]; then
+            echo "::warning::CRON_SECRET 또는 HBUZZ_URL 미설정 — 점검 건너뜀"; exit 0
+          fi
+          for i in 1 2 3; do
+            if curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" "$HBUZZ_URL/api/health-check"; then exit 0; fi
+            echo "재시도 $i"; sleep 20
+          done
+          exit 1

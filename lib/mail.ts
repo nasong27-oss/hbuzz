@@ -10,12 +10,16 @@ export function mailConfigured() {
 
 export async function sendMail(opts: { to: string[]; subject: string; html: string; text: string }) {
   if (!mailConfigured()) throw new Error("GMAIL_APP_PASSWORD 환경변수가 없어 발송할 수 없습니다.");
-  const transport = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user: SENDER, pass: process.env.GMAIL_APP_PASSWORD },
-  });
+  // SMTP_TEST_HOST 는 로컬 테스트 전용(가짜 SMTP 서버). 운영에서는 비워 둔다.
+  const testHost = process.env.SMTP_TEST_HOST;
+  const transport = testHost
+    ? nodemailer.createTransport({ host: testHost, port: Number(process.env.SMTP_TEST_PORT || 2525), secure: false })
+    : nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: { user: SENDER, pass: process.env.GMAIL_APP_PASSWORD },
+      });
   // 수신자끼리 서로의 주소가 보이지 않게 BCC 로 보낸다
   await transport.sendMail({
     from: `현대카드 버즈 <${SENDER}>`,

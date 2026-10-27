@@ -7,6 +7,7 @@ import { fmtDateTime } from "@/lib/time";
 import { Flash, Nav } from "@/components/ui";
 import { CloudPanel } from "@/components/CloudPanel";
 import { kstToday } from "@/lib/time";
+import { alertRecipients } from "@/lib/alert";
 import {
   addKeywords,
   addRecipients,
@@ -14,6 +15,7 @@ import {
   deleteRecipient,
   initDb,
   renameRecipient,
+  sendTestAlert,
   sendTestMail,
   toggleKeyword,
   toggleRecipient,
@@ -254,6 +256,8 @@ const KIND: Record<string, string> = {
   daily: "아침 자동",
   backup: "클라우드 백업",
   manual: "조회 결과",
+  alert: "실패 알림",
+  alert_test: "알림 테스트",
   resend: "리포트 재발송",
 };
 
@@ -410,7 +414,7 @@ function minutes(a: string, b: string | null) {
 }
 
 async function Ops() {
-  const [runs, warnings, diags, primary] = await Promise.all([
+  const [runs, warnings, diags, primary, lastAlert] = await Promise.all([
     q<Run>(`SELECT * FROM runs ORDER BY started_at DESC LIMIT 20`),
     healthWarnings(),
     q<DiagRow>(
@@ -421,6 +425,10 @@ async function Ops() {
       `SELECT count(*)::int AS n FROM reports WHERE report_date = $1
        AND COALESCE((stats->>'backup')::boolean, false) = false`,
       [kstToday()],
+    ),
+    q<{ created_at: string; subject: string }>(
+      `SELECT created_at, subject FROM send_logs WHERE kind IN ('alert','alert_test')
+       ORDER BY created_at DESC LIMIT 1`,
     ),
   ]);
   const envOrder = ["home-mac", "vercel-icn1", "github-actions"];
@@ -477,6 +485,37 @@ async function Ops() {
             각 작업 전에 GitHub에서 최신 코드를 받아 반영합니다.
           </p>
         </div>
+      </div>
+
+      <div className="panel stack">
+        <div>
+          <h2 style={{ marginBottom: 4 }}>집 Mac 실패 알림</h2>
+          <p className="small muted" style={{ margin: 0, maxWidth: "70ch" }}>
+            매일 08:10 전후로 아침 리포트 발송 기록을 확인하고, 없으면 원인(Mac 꺼짐, 생성 실패, 발송 실패)과 함께
+            메일로 알립니다. 하루 한 번만 보냅니다.
+          </p>
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 18 }} className="small">
+          <li>
+            받는 주소: <b>{alertRecipients().join(", ")}</b>{" "}
+            <span className="muted">(ALERT_TO로 변경)</span>
+          </li>
+          <li>
+            <span className={`status ${process.env.CRON_SECRET ? "success" : "failed"}`}>
+              {process.env.CRON_SECRET ? "설정됨" : "없음"}
+            </span>{" "}
+            점검 비밀키 <span className="muted">CRON_SECRET</span>
+          </li>
+          <li>
+            마지막 알림:{" "}
+            {lastAlert[0] ? `${fmtDateTime(lastAlert[0].created_at)} ${lastAlert[0].subject}` : "없음"}
+          </li>
+        </ul>
+        <form action={sendTestAlert}>
+          <button type="submit" disabled={!mailConfigured()}>
+            테스트 알림 보내기
+          </button>
+        </form>
       </div>
 
       <CloudPanel hasPrimaryToday={(primary[0]?.n ?? 0) > 0} hasDiag={diags.some((d) => d.env === "vercel-icn1")} />

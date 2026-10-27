@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { parseEmails, SENDER, sendMail } from "@/lib/mail";
+import { diagnoseToday, sendAlert } from "@/lib/alert";
 
 const back = (tab: string, key: "ok" | "err", msg: string) =>
   redirect(`/admin?tab=${tab}&${key}=${encodeURIComponent(msg)}`);
@@ -130,4 +131,20 @@ export async function sendTestMail() {
     back("ops", "err", `테스트 발송 실패: ${e instanceof Error ? e.message : String(e)}`);
   }
   back("ops", "ok", `${SENDER}로 테스트 메일을 보냈습니다.`);
+}
+
+export async function sendTestAlert() {
+  await requireRole("admin");
+  try {
+    const d = await diagnoseToday();
+    const prod = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    const r = await sendAlert(
+      d.ok ? { ok: false, title: "알림 테스트", detail: ["실제 장애 시 이런 형식으로 옵니다.", `현재 상태: ${d.title}`] } : d,
+      { siteUrl: prod ? `https://${prod}` : undefined, test: true },
+    );
+    back("ops", "ok", `${r.to.join(", ")}로 테스트 알림을 보냈습니다.`);
+  } catch (e) {
+    if (e && typeof e === "object" && "digest" in e) throw e; // redirect 통과
+    back("ops", "err", `테스트 알림 실패: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }

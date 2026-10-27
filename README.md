@@ -54,10 +54,16 @@
    | `AUTH_SECRET` | 32자 이상 아무 랜덤 문자열 |
    | `GMAIL_APP_PASSWORD` | nasong27@gmail.com 앱 비밀번호 16자리 |
    | `ANTHROPIC_API_KEY` | Anthropic API 키 (클라우드 백업 수집용) |
+   | `CRON_SECRET` | 32자 이상 랜덤 문자열 (Mac 실패 알림 점검용) |
+   | `ALERT_TO` | (선택) 실패 알림 받을 주소. 비우면 nasong27@gmail.com |
 
 4. Deployments > 최신 배포 > **Redeploy** (환경변수 반영)
 5. 사이트 접속 → 관리자 비밀번호로 로그인 → 관리 > 운영 > **DB 초기화** → **테스트 메일 보내기**
 6. 관리 > 수신자, 관리 > 키워드 등록
+
+7. GitHub 레포 > Settings > Secrets and variables > Actions
+   - Secrets에 `CRON_SECRET` (Vercel과 같은 값)
+   - Variables에 `HBUZZ_URL` (사이트 주소, 예: `https://hbuzz.vercel.app`)
 
 이후 `main` 브랜치에 push 할 때마다 자동 배포된다.
 
@@ -101,6 +107,17 @@ cd ~/hbuzz/collector && .venv/bin/python main.py --dry-run --no-dedupe
 
 권한: 팀 비밀번호는 조회와 **등록된 수신자에게만** 발송, 관리자는 임의 주소 발송과 관리 기능까지.
 메일은 BCC로 나가 수신자끼리 주소가 보이지 않는다.
+
+### 집 Mac 실패 알림
+
+매일 아침 발송 기록을 확인해, 없으면 원인을 구분해 Gmail로 한 통 보낸다.
+원인은 Mac 꺼짐·잠자기, 생성 실패, 생성 지연, 발송 실패 중 하나로 나온다.
+
+- 두 곳에서 점검한다(먼저 도착한 쪽만 메일을 보내고, 하루 한 번만 보냄).
+  - Vercel 크론: 무료 플랜이라 08:05~09:04 중에 실행된다.
+  - GitHub Actions: 08:10 실행이며, 보통 수 분 지연된다.
+- 클라우드 백업 발송이 성공한 날은 정상으로 본다.
+- 관리 > 운영에서 받는 주소 확인과 테스트 알림을 할 수 있다.
 
 ### 집 Mac이 실패한 날: 클라우드 백업 수집
 

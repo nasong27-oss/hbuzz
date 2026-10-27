@@ -1,10 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["icn1"],
+  "regions": [
+    "icn1"
+  ],
   "functions": {
     "api/cloud.py": {
       "maxDuration": 300,
       "excludeFiles": "{node_modules,.next,app,components,lib,public,db,.github,collector/tests,collector/data,collector/reports,collector/.venv}/**"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/health-check",
+      "schedule": "5 23 * * *"
+    }
+  ]
 }
